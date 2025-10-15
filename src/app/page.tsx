@@ -1,103 +1,146 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { motion } from "framer-motion";
+
+export default function HomePage() {
+  const router = useRouter();
+  const [name, setName] = useState("");
+  const [showAdminInput, setShowAdminInput] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+
+  const handleStart = () => {
+    if (!name.trim()) {
+      alert("Please enter your name before starting!");
+      return;
+    }
+
+    localStorage.setItem("playerName", name);
+    router.push("/quiz");
+  };
+  const goToAdmin = () => {
+    const password = prompt("Enter admin password:");
+    if (password === "baby123") {
+      // simple auth, change as needed
+      router.push("/admin");
+    } else {
+      alert("Wrong password!");
+    }
+  };
+  const handleAdminLogin = () => {
+    if (adminPassword === "baby123") {
+      router.push("/admin");
+    } else {
+      alert("Wrong password!");
+    }
+    setAdminPassword("");
+    setShowAdminInput(false);
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+    <main
+      className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden"
+      style={{
+        backgroundImage: 'url("/background/image.png")',
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
+    >
+      {/* Admin Button / Field */}
+      <div className="absolute top-5 right-5 flex items-center z-20">
+        {showAdminInput ? (
+          <div className="flex items-center gap-2">
+            <input
+              type="password"
+              placeholder="Password"
+              value={adminPassword}
+              onChange={(e) => setAdminPassword(e.target.value)}
+              className="border text-black border-gray-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:border-[#404040]"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <button
+              onClick={handleAdminLogin}
+              className="bg-gray-200 hover:bg-gray-300 text-black px-3 py-1 rounded-lg shadow-md transition-all"
+            >
+              Go
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowAdminInput(true)}
+            className="bg-[#f0f0f0] hover:bg-gray-300 text-black px-3 py-1 rounded-lg shadow-md transition-all"
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+            Admin Login
+          </button>
+        )}
+      </div>
+      {/* Floating balloons effect */}
+      <motion.div
+        className="absolute w-20 h-20 bg-pink-300 rounded-full opacity-40"
+        animate={{ y: [0, -30, 0] }}
+        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+        style={{ top: "10%", left: "20%" }}
+      />
+      <motion.div
+        className="absolute w-16 h-16 bg-pink-400 rounded-full opacity-40"
+        animate={{ y: [0, -20, 0] }}
+        transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        style={{ top: "70%", left: "70%" }}
+      />
+      <motion.div
+        className="absolute w-12 h-12 bg-pink-200 rounded-full opacity-40"
+        animate={{ y: [0, -25, 0] }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+        style={{ top: "30%", left: "80%" }}
+      />
+
+      {/* Main Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 40, scale: 0.9 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: "easeOut" }}
+        className="bg-white shadow-xl rounded-2xl p-8 w-[90%] max-w-md text-center relative z-10"
+      >
+        <motion.h1
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.6 }}
+          className="text-3xl font-extrabold text-[#404040] mb-3"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Hey Baby Experts!
+        </motion.h1>
+
+        <motion.p
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="text-gray-600 mb-6"
         >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+          Enter your name to begin the fun
+        </motion.p>
+
+        <motion.input
+          type="text"
+          name=""
+          placeholder="Your Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          whileFocus={{ scale: 1.05 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="w-full border text-black border-[#404040] rounded-lg p-3 mb-5 focus:outline-none focus:ring-2 focus:[#e899a4]"
+        />
+
+        <motion.button
+          onClick={handleStart}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          animate={{ y: [0, -5, 0] }}
+          transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+          className="w-full bg-[#404040]  text-white font-semibold py-3 rounded-lg shadow-lg transition-all"
         >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          Start
+        </motion.button>
+      </motion.div>
+    </main>
   );
 }
