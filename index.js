@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const sqlite3 = require("sqlite3").verbose();
+const path = require("path");
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -13,7 +14,8 @@ app.use(cors());
 app.use(bodyParser.json());
 
 // Initialize SQLite database
-const db = new sqlite3.Database("./database.sqlite", (err) => {
+const dbPath = path.resolve(__dirname, "database.sqlite");
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error("DB Connection Error:", err.message);
   else console.log("Connected to SQLite database");
 });
@@ -27,6 +29,11 @@ db.run(`
     date TEXT
   )
 `);
+
+// Root route
+app.get("/", (req, res) => {
+  res.send("Backend is running! Use /api/results to GET or POST quiz results.");
+});
 
 // Save participant result
 app.post("/api/results", (req, res) => {
@@ -45,10 +52,8 @@ app.post("/api/results", (req, res) => {
     }
   );
 });
-app.get("/", (req, res) => {
-    res.send("Backend is running! Use /api/results to GET or POST quiz results.");
-  });
 
+// Get all results sorted by highest score, earliest submission first
 app.get("/api/results", (req, res) => {
   db.all(`SELECT * FROM results ORDER BY score DESC, date ASC`, [], (err, rows) => {
     if (err) return res.status(500).json({ success: false, error: err.message });
