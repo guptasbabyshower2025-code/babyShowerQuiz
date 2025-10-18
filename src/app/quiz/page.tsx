@@ -12,11 +12,27 @@ export default function QuizPage() {
   const [score, setScore] = useState(1);
   const [timeLeft, setTimeLeft] = useState(20); // 20s per question
   const [playerName, setPlayerName] = useState("");
+  const [quizActive, setQuizActive] = useState(false);
+  const [quizLoading, setQuizLoading] = useState(true);
 
   const currentQuestion: Question = questions[currentIndex];
   useEffect(() => {
     const storedName = localStorage.getItem("playerName");
     if (storedName) setPlayerName(storedName);
+  }, []);
+  useEffect(() => {
+    const fetchQuizStatus = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/api/quiz-status");
+        const data = await res.json();
+        setQuizActive(data.active); // backend should return { active: true/false }
+      } catch (err) {
+        console.error("Error fetching quiz status:", err);
+      } finally {
+        setQuizLoading(false);
+      }
+    };
+    fetchQuizStatus();
   }, []);
 
   // Timer
@@ -31,17 +47,20 @@ export default function QuizPage() {
   }, [timeLeft]);
   const submitResult = async (playerName: string, score: number) => {
     try {
-      const res = await fetch("https://babyshowerquiz.onrender.com/api/results", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: playerName,
-          score,
-          date: new Date().toISOString(),
-        }),
-      });
+      const res = await fetch(
+        "https://babyshowerquiz.onrender.com/api/results",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: playerName,
+            score,
+            date: new Date().toISOString(),
+          }),
+        }
+      );
 
       const data = await res.json();
       if (data.success) {
@@ -77,13 +96,13 @@ export default function QuizPage() {
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      // Quiz finished
-
-      // Call backend API to save result
-      submitResult(playerName, score);
-
-      // Navigate to result page
-      router.push("/result");
+      if (quizActive) {
+        submitResult(playerName, score);
+        router.push("/result");
+      } else {
+        alert("Quiz is no longer active!");
+        router.push("/");
+      }
     }
   };
 

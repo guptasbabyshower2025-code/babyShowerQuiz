@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -9,13 +9,18 @@ export default function HomePage() {
   const [name, setName] = useState("");
   const [showAdminInput, setShowAdminInput] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
+  const [quizActive, setQuizActive] = useState(false);
+  const [quizLoading, setQuizLoading] = useState(true);
 
   const handleStart = () => {
     if (!name.trim()) {
       alert("Please enter your name before starting!");
       return;
     }
-
+    if (!quizActive) {
+      alert("Quiz is not active!");
+      return;
+    }
     localStorage.setItem("playerName", name);
     router.push("/quiz");
   };
@@ -38,6 +43,20 @@ export default function HomePage() {
     setShowAdminInput(false);
   };
 
+  useEffect(() => {
+    const fetchQuizStatus = async () => {
+      try {
+        const res = await fetch("http://localhost:3001/api/quiz-status");
+        const data = await res.json();
+        setQuizActive(data.active); // backend should return { active: true/false }
+      } catch (err) {
+        console.error("Error fetching quiz status:", err);
+      } finally {
+        setQuizLoading(false);
+      }
+    };
+    fetchQuizStatus();
+  }, []);
   return (
     <main
       className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden"
