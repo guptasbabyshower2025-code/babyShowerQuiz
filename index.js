@@ -32,7 +32,15 @@ const resultSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
 });
 
+const quizControlSchema = new mongoose.Schema({
+  active: {
+    type: Boolean,
+    default: false,
+  },
+});
+
 const Result = mongoose.model("Result", resultSchema);
+const QuizControl = mongoose.model("QuizControl", quizControlSchema);
 
 // Root route
 app.get("/", (req, res) => {
@@ -71,6 +79,38 @@ app.delete("/api/results", async (req, res) => {
   try {
     await Result.deleteMany({});
     res.json({ success: true, message: "All results cleared" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get("/api/quiz-status", async (req, res) => {
+  try {
+    let quizControl = await QuizControl.findOne();
+    if (!quizControl) {
+      quizControl = new QuizControl();
+      await quizControl.save();
+    }
+    res.json({ active: quizControl.active });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+app.post("/api/quiz-status", async (req, res) => {
+  try {
+    const { active } = req.body;
+    let quizControl = await QuizControl.findOne();
+    if (!quizControl) {
+      quizControl = new QuizControl({ active });
+    } else {
+      quizControl.active = active;
+    }
+    await quizControl.save();
+    res.json({
+      success: true,
+      message: "Quiz status updated",
+      active: quizControl.active,
+    });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
