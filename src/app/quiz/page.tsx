@@ -23,7 +23,7 @@ export default function QuizPage() {
   useEffect(() => {
     const fetchQuizStatus = async () => {
       try {
-        const res = await fetch("http://localhost:3001/api/quiz-status");
+        const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
         const data = await res.json();
         setQuizActive(data.active); // backend should return { active: true/false }
       } catch (err) {
