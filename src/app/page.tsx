@@ -13,6 +13,7 @@ export default function HomePage() {
   const [quizLoading, setQuizLoading] = useState(true);
 
   const handleStart = () => {
+    fetchQuizStatus();
     if (!name.trim()) {
       alert("Please enter your name before starting!");
       return;
@@ -24,15 +25,15 @@ export default function HomePage() {
     localStorage.setItem("playerName", name);
     router.push("/quiz");
   };
-  const goToAdmin = () => {
-    const password = prompt("Enter admin password:");
-    if (password === "baby123") {
-      // simple auth, change as needed
-      router.push("/admin");
-    } else {
-      alert("Wrong password!");
-    }
-  };
+  // const goToAdmin = () => {
+  //   const password = prompt("Enter admin password:");
+  //   if (password === "baby123") {
+  //     // simple auth, change as needed
+  //     router.push("/admin");
+  //   } else {
+  //     alert("Wrong password!");
+  //   }
+  // };
   const handleAdminLogin = () => {
     if (adminPassword === "baby123") {
       router.push("/admin");
@@ -42,21 +43,18 @@ export default function HomePage() {
     setAdminPassword("");
     setShowAdminInput(false);
   };
+  const fetchQuizStatus = async () => {
+    try {
+      const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
+      const data = await res.json();
+      setQuizActive(data.active); // backend should return { active: true/false }
+    } catch (err) {
+      console.error("Error fetching quiz status:", err);
+    } finally {
+      setQuizLoading(false);
+    }
+  };
 
-  useEffect(() => {
-    const fetchQuizStatus = async () => {
-      try {
-        const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
-        const data = await res.json();
-        setQuizActive(data.active); // backend should return { active: true/false }
-      } catch (err) {
-        console.error("Error fetching quiz status:", err);
-      } finally {
-        setQuizLoading(false);
-      }
-    };
-    fetchQuizStatus();
-  }, []);
   return (
     <main
       className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 to-pink-200 relative overflow-hidden"
