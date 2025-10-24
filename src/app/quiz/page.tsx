@@ -20,15 +20,17 @@ export default function QuizPage() {
     const storedName = localStorage.getItem("playerName");
     if (storedName) setPlayerName(storedName);
   }, []);
-  const fetchQuizStatus = async () => {
+  const fetchQuizStatus = async (): Promise<boolean> => {
     try {
       const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
       const data = await res.json();
-      setQuizActive(data.active); // backend should return { active: true/false }
-    } catch (err) {
-      console.error("Error fetching quiz status:", err);
-    } finally {
-      setQuizLoading(false);
+
+      setQuizActive(data.active);
+
+      return data.active;
+    } catch (error) {
+      console.error("Failed to fetch quiz status:", error);
+      return false;
     }
   };
 
@@ -71,7 +73,7 @@ export default function QuizPage() {
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     // Check answer
     if (selectedAnswer) {
       if (
@@ -94,8 +96,8 @@ export default function QuizPage() {
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
-      fetchQuizStatus();
-      if (quizActive) {
+      const isActive = await fetchQuizStatus();
+      if (isActive) {
         submitResult(playerName, score);
         router.push("/result");
       } else {

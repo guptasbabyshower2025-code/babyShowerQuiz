@@ -12,13 +12,14 @@ export default function HomePage() {
   const [quizActive, setQuizActive] = useState(false);
   const [quizLoading, setQuizLoading] = useState(true);
 
-  const handleStart = () => {
-    fetchQuizStatus();
+  const handleStart = async () => {
     if (!name.trim()) {
       alert("Please enter your name before starting!");
       return;
     }
-    if (!quizActive) {
+    const isActive = await fetchQuizStatus();
+
+    if (!isActive) {
       alert("Quiz is not active!");
       return;
     }
@@ -43,15 +44,17 @@ export default function HomePage() {
     setAdminPassword("");
     setShowAdminInput(false);
   };
-  const fetchQuizStatus = async () => {
+  const fetchQuizStatus = async (): Promise<boolean> => {
     try {
       const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
       const data = await res.json();
-      setQuizActive(data.active); // backend should return { active: true/false }
-    } catch (err) {
-      console.error("Error fetching quiz status:", err);
-    } finally {
-      setQuizLoading(false);
+
+      setQuizActive(data.active);
+
+      return data.active;
+    } catch (error) {
+      console.error("Failed to fetch quiz status:", error);
+      return false;
     }
   };
 
