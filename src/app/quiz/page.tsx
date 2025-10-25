@@ -13,7 +13,7 @@ export default function QuizPage() {
   const [timeLeft, setTimeLeft] = useState(20); // 20s per question
   const [playerName, setPlayerName] = useState("");
   const [quizActive, setQuizActive] = useState(false);
-  const [quizLoading, setQuizLoading] = useState(true);
+  const [quizLoading, setQuizLoading] = useState(false);
 
   const currentQuestion: Question = questions[currentIndex];
   useEffect(() => {
@@ -22,7 +22,9 @@ export default function QuizPage() {
   }, []);
   const fetchQuizStatus = async (): Promise<boolean> => {
     try {
-      const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
+      const res = await fetch(
+        "https://babyshowerquiz.onrender.com/api/quiz-status"
+      );
       const data = await res.json();
 
       setQuizActive(data.active);
@@ -33,7 +35,6 @@ export default function QuizPage() {
       return false;
     }
   };
-
 
   // Timer
   useEffect(() => {
@@ -74,7 +75,6 @@ export default function QuizPage() {
   };
 
   const handleNext = async () => {
-    // Check answer
     if (selectedAnswer) {
       if (
         (currentQuestion.type === "short" &&
@@ -85,7 +85,6 @@ export default function QuizPage() {
         (currentQuestion.type === "image" &&
           selectedAnswer === currentQuestion.answer)
       ) {
-        console.log("Score,", score, selectedAnswer, currentQuestion.answer);
         setScore(score + 1);
       }
     }
@@ -96,11 +95,17 @@ export default function QuizPage() {
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
+      // ⏳ Start loader for final submission
+      setQuizLoading(true);
+
       const isActive = await fetchQuizStatus();
+
       if (isActive) {
-        submitResult(playerName, score);
+        await submitResult(playerName, score);
+        setQuizLoading(false);
         router.push("/result");
       } else {
+        setQuizLoading(false);
         alert("Quiz is no longer active!");
         router.push("/");
       }
@@ -235,13 +240,33 @@ export default function QuizPage() {
             )}
 
             {/* Next Button */}
-            <button
+
+            <motion.button
               onClick={handleNext}
-              disabled={!selectedAnswer}
-              className="mt-6 w-full bg-[#404040]  text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50"
+              disabled={!selectedAnswer || quizLoading}
+              whileHover={{ scale: quizLoading ? 1 : 1.03 }}
+              whileTap={{ scale: quizLoading ? 1 : 0.95 }}
+              className={`mt-6 w-full flex justify-center items-center gap-2 
+        ${quizLoading ? "bg-gray-600" : "bg-[#404040]"} 
+        text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50`}
             >
-              {currentIndex + 1 === questions.length ? "Submit" : "Next"}
-            </button>
+              {quizLoading ? (
+                // 🌀 Framer Motion Loader
+                <motion.div
+                  className="w-6 h-6 border-4 border-white border-t-transparent rounded-full"
+                  animate={{ rotate: 360 }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    ease: "linear",
+                  }}
+                />
+              ) : currentIndex + 1 === questions.length ? (
+                "Submit"
+              ) : (
+                "Next"
+              )}
+            </motion.button>
           </motion.div>
         </AnimatePresence>
       </div>

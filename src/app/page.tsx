@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 
@@ -10,14 +10,21 @@ export default function HomePage() {
   const [showAdminInput, setShowAdminInput] = useState(false);
   const [adminPassword, setAdminPassword] = useState("");
   const [quizActive, setQuizActive] = useState(false);
-  const [quizLoading, setQuizLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
 
   const handleStart = async () => {
     if (!name.trim()) {
-      alert("Please enter your name before starting!");
+      alert("Please enter your name!");
+      nameInputRef.current?.focus(); 
       return;
     }
+    setLoading(true);
+
     const isActive = await fetchQuizStatus();
+
+    setLoading(false);
 
     if (!isActive) {
       alert("Quiz is not active!");
@@ -46,7 +53,9 @@ export default function HomePage() {
   };
   const fetchQuizStatus = async (): Promise<boolean> => {
     try {
-      const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
+      const res = await fetch(
+        "https://babyshowerquiz.onrender.com/api/quiz-status"
+      );
       const data = await res.json();
 
       setQuizActive(data.active);
@@ -144,6 +153,7 @@ export default function HomePage() {
           name=""
           placeholder="Your Name"
           value={name}
+          ref={nameInputRef}
           onChange={(e) => setName(e.target.value)}
           whileFocus={{ scale: 1.05 }}
           transition={{ type: "spring", stiffness: 200 }}
@@ -152,13 +162,24 @@ export default function HomePage() {
 
         <motion.button
           onClick={handleStart}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-          animate={{ y: [0, -5, 0] }}
+          whileHover={{ scale: loading ? 1 : 1.05 }}
+          whileTap={{ scale: loading ? 1 : 0.95 }}
+          animate={!loading ? { y: [0, -5, 0] } : {}}
           transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
-          className="w-full bg-[#404040]  text-white font-semibold py-3 rounded-lg shadow-lg transition-all"
+          disabled={loading}
+          className={`w-full flex justify-center items-center gap-2 ${
+            loading ? "bg-gray-600" : "bg-[#404040]"
+          } text-white font-semibold py-3 rounded-lg shadow-lg transition-all`}
         >
-          Start
+          {loading ? (
+            <motion.div
+              className="w-6 h-6 border-4 border-white border-t-transparent rounded-full"
+              animate={{ rotate: 360 }}
+              transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+            />
+          ) : (
+            "Start"
+          )}
         </motion.button>
       </motion.div>
     </main>
