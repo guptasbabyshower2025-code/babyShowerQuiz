@@ -22,19 +22,11 @@ export default function HomePage() {
       return;
     }
 
-    setLoading(true);
-    const isActive = await fetchQuizStatus();
-    setLoading(false);
-
     localStorage.setItem("playerName", name);
 
-    if (!isActive) {
-      // Quiz not started yet → join waiting room
-      socket.emit("joinWaitingRoom", name);
-      router.push("/waiting-room");
-    } else {
-      router.push("/quiz");
-    }
+    // Quiz not started yet → join waiting room
+    socket.emit("joinWaitingRoom", name);
+    router.push("/waiting-room");
   };
   // const goToAdmin = () => {
   //   const password = prompt("Enter admin password:");
@@ -54,21 +46,7 @@ export default function HomePage() {
     setAdminPassword("");
     setShowAdminInput(false);
   };
-  const fetchQuizStatus = async (): Promise<boolean> => {
-    try {
-      const res = await fetch(
-        "https://babyshowerquiz.onrender.com/api/quiz-status"
-      );
-      const data = await res.json();
-
-      setQuizActive(data.active);
-
-      return data.active;
-    } catch (error) {
-      console.error("Failed to fetch quiz status:", error);
-      return false;
-    }
-  };
+  
 
   return (
     <main
