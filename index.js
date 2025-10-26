@@ -3,15 +3,72 @@ const express = require("express");
 const cors = require("cors");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
+const http = require("http");
+const { Server } = require("socket.io");
 
 const app = express();
 const port = process.env.PORT || 3001;
 
-// Middlewares
+// --- Create HTTP server for both Express & Socket.IO ---
+const server = http.createServer(app);
+
+// --- Initialize Socket.IO server ---
+const io = new Server(server, {
+  cors: {
+    origin: [
+      "https://my-next-app-one-liart.vercel.app", // ✅ REPLACE with your actual Vercel URL
+      "http://localhost:3000", // optional for local testing
+    ],
+    methods: ["GET", "POST"],
+  },
+});
+
+// --- SOCKET.IO REAL-TIME QUIZ LOGIC ---
+const rooms = {}; // { quizId: Set<userIds> }
+
+io.on("connection", (socket) => {
+  console.log("🟢 User connected:", socket.id);
+
+  // Participant joins a quiz room
+  socket.on("join_room", ({ quizId, userId }) => {
+    if (!rooms[quizId]) rooms[quizId] = new Set();
+    rooms[quizId].add(userId);
+
+    // Store room name in socket for cleanup on disconnect
+    socket.quizId = quizId;
+    socket.userId = userId;
+
+    const count = rooms[quizId].size;
+    console.log(`👥 Quiz ${quizId} now has ${count} participants`);
+
+    // Notify *only the admin* and participants of that quiz room
+    io.emit("participant_count_update", { quizId, count });
+  });
+
+  // Admin starts the quiz
+  socket.on("start_quiz", ({ quizId }) => {
+    console.log(`🚀 Quiz ${quizId} started!`);
+    io.emit("quiz_started", { quizId });
+  });
+
+  // Handle disconnects
+  socket.on("disconnect", () => {
+    const { quizId, userId } = socket;
+    if (quizId && rooms[quizId]) {
+      rooms[quizId].delete(userId);
+      const count = rooms[quizId].size;
+      io.emit("participant_count_update", { quizId, count });
+      console.log(`🔴 User ${userId} left quiz ${quizId}. Remaining: ${count}`);
+    }
+  });
+});
+
+
+// --- EXPRESS MIDDLEWARES ---
 app.use(cors());
 app.use(bodyParser.json());
 
-// Connect to MongoDB Atlas
+// --- CONNECT TO MONGODB ---
 const mongoURI =
   process.env.MONGO_URI ||
   "mongodb+srv://guptasbabyshower2025_db_user:D6rd1Su1CFTPyTvl@cluster0.srj6ouo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0";
@@ -25,7 +82,8 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB Atlas"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-// Schema and Model
+
+// --- SCHEMAS AND MODELS ---
 const resultSchema = new mongoose.Schema({
   name: String,
   score: Number,
@@ -33,21 +91,19 @@ const resultSchema = new mongoose.Schema({
 });
 
 const quizControlSchema = new mongoose.Schema({
-  active: {
-    type: Boolean,
-    default: false,
-  },
+  active: { type: Boolean, default: false },
 });
 
 const Result = mongoose.model("Result", resultSchema);
 const QuizControl = mongoose.model("QuizControl", quizControlSchema);
 
-// Root route
+
+// --- ROUTES ---
 app.get("/", (req, res) => {
-  res.send("Backend is running! Use /api/results to GET or POST quiz results.");
+  res.send("✅ Backend with Socket.IO is running fine!");
 });
 
-// POST - Save participant result
+// Save participant result
 app.post("/api/results", async (req, res) => {
   try {
     const { name, score, date } = req.body;
@@ -64,7 +120,7 @@ app.post("/api/results", async (req, res) => {
   }
 });
 
-// GET - Fetch results (sorted: highest score, then earliest submission)
+// Get results
 app.get("/api/results", async (req, res) => {
   try {
     const results = await Result.find().sort({ score: -1, date: 1 });
@@ -74,7 +130,7 @@ app.get("/api/results", async (req, res) => {
   }
 });
 
-// DELETE - Clear all results (Admin)
+// Clear results (Admin only)
 app.delete("/api/results", async (req, res) => {
   try {
     await Result.deleteMany({});
@@ -84,6 +140,7 @@ app.delete("/api/results", async (req, res) => {
   }
 });
 
+// Get quiz status
 app.get("/api/quiz-status", async (req, res) => {
   try {
     let quizControl = await QuizControl.findOne();
@@ -96,6 +153,8 @@ app.get("/api/quiz-status", async (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
+
+// Update quiz status
 app.post("/api/quiz-status", async (req, res) => {
   try {
     const { active } = req.body;
@@ -116,7 +175,7 @@ app.post("/api/quiz-status", async (req, res) => {
   }
 });
 
-// Start server
-app.listen(port, () =>
-  console.log(`🚀 Server running on http://localhost:${port}`)
-);
+// --- START SERVER ---
+server.listen(port, () => {
+  console.log(`🚀 Express + Socket.IO server running on port ${port}`);
+});
