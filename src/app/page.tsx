@@ -14,6 +14,7 @@ export default function HomePage() {
   const [quizActive, setQuizActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const quizId = "baby_quiz_001"; // Example quiz ID
 
   const handleStart = async () => {
     if (!name.trim()) {
@@ -25,8 +26,35 @@ export default function HomePage() {
     localStorage.setItem("playerName", name);
 
     // Quiz not started yet → join waiting room
-    socket.emit("joinWaitingRoom", name);
-    router.push("/waiting-room");
+    setLoading(true);
+    const isActive = await fetchQuizStatus(); // fetch the quiz status
+    if (!isActive) {
+      socket.emit(
+        "join_room",
+        { quizId, name },
+        (res: { success: boolean }) => {
+          if (res.success) router.push("/waiting-room");
+        }
+      );
+      setLoading(false);
+      router.push("/waiting-room");
+      return;
+    } else {
+      router.push("/quiz");
+    }
+  };
+  const fetchQuizStatus = async () => {
+    try {
+      const res = await fetch("http://localhost:3001/api/quiz-status");
+      const data = await res.json();
+      setQuizActive(data.active); // backend should return { active: true/false }
+      return data.active; // return the active status
+    } catch (err) {
+      console.error("Error fetching quiz status:", err);
+      return false; // default to false in case of error
+    } finally {
+      setLoading(false);
+    }
   };
   // const goToAdmin = () => {
   //   const password = prompt("Enter admin password:");

@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import io from "socket.io-client";
-
-
+const socket = io("https://babyshowerquiz.onrender.com");
 interface Result {
   id: number;
   name: string;
@@ -18,19 +17,34 @@ export default function AdminPage() {
   const [quizLoading, setQuizLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
+  const quizId = "baby_quiz_001"; // Example quiz ID
 
   useEffect(() => {
-    const socket = io("https://babyshowerquiz.onrender.com");
+    // Admin joins the quiz room
+    socket.emit(
+      "join_room",
+      { quizId, name: "admin" },
+      (res: { success: boolean }) => {
+        if (!res.success) console.error("Admin failed to join the quiz room");
+      }
+    );
 
     // Listen for participant count updates
-    socket.on("participantCount", (count: number) => {
-      setParticipantCount(count);
-    });
+    const handleCountUpdate = ({
+      quizId: id,
+      count,
+    }: {
+      quizId: string;
+      count: number;
+    }) => {
+      if (id === quizId) setParticipantCount(count);
+    };
+    socket.on("participant_count_update", handleCountUpdate);
 
     return () => {
-      socket.disconnect();
+      socket.off("participant_count_update", handleCountUpdate);
     };
-  }, []);
+  }, [quizId]);
 
   // ✅ Fetch quiz status
   useEffect(() => {
@@ -79,20 +93,17 @@ export default function AdminPage() {
   const handleToggle = async () => {
     setUpdating(true);
     try {
-      const res = await fetch(
-        "https://babyshowerquiz.onrender.com/api/quiz-status",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ active: !quizActive }),
-        }
-      );
+      const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !quizActive }),
+      });
       const data = await res.json();
       setQuizActive(data.active);
-
-      if (!quizActive) {
-        const socket = io("https://babyshowerquiz.onrender.com");
-        socket.emit("startQuiz");
+  
+      // ✅ Only emit start_quiz if the quiz is now active
+      if (data.active) {
+        socket.emit("start_quiz", { quizId });
       }
     } catch (err) {
       console.error("Error updating quiz status:", err);
@@ -119,8 +130,8 @@ export default function AdminPage() {
         <h2 className="text-lg font-semibold text-gray-700 mb-3">
           Quiz Control
         </h2>
-        <p className="text-lg mb-2">
-          👥 Participants joined:{" "}
+        <p className="text-lg text-black mb-2">
+          Participants joined:{" "}
           <span className="font-bold">{participantCount}</span>
         </p>
 
