@@ -16,53 +16,64 @@ const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
     origin: [
-      "https://my-next-app-one-liart.vercel.app", // ✅ REPLACE with your actual Vercel URL
-      "http://localhost:3000", // optional for local testing
+      "https://my-next-app-one-liart.vercel.app", // REPLACE with your actual Vercel URL
+      "http://localhost:3000",
+      "http://192.168.1.4:3000",
     ],
     methods: ["GET", "POST"],
   },
 });
 
 // --- SOCKET.IO REAL-TIME QUIZ LOGIC ---
-const rooms = {}; // { quizId: Set<userIds> }
+const rooms = {}; // { quizId: Set<userNames> }
 
 io.on("connection", (socket) => {
   console.log("🟢 User connected:", socket.id);
 
   // Participant joins a quiz room
-  socket.on("join_room", ({ quizId, userId }) => {
+  socket.on("join_room", ({ quizId, name }, callback) => {
+    if (!quizId || !name) {
+      console.log("⚠️ join_room missing quizId or name", { quizId, name });
+      if (callback) callback({ success: false });
+      return;
+    }
+
     if (!rooms[quizId]) rooms[quizId] = new Set();
-    rooms[quizId].add(userId);
+    rooms[quizId].add(name);
 
-    // Store room name in socket for cleanup on disconnect
     socket.quizId = quizId;
-    socket.userId = userId;
+    socket.name = name;
 
-    const count = rooms[quizId].size;
-    console.log(`👥 Quiz ${quizId} now has ${count} participants`);
+    socket.join(quizId); // add to Socket.IO room
 
-    // Notify *only the admin* and participants of that quiz room
-    io.emit("participant_count_update", { quizId, count });
+    const count = [...rooms[quizId]].filter((name) => name !== "admin").length;
+    io.to(quizId).emit("participant_count_update", { quizId, count });
+
+    if (callback) callback({ success: true });
   });
 
   // Admin starts the quiz
   socket.on("start_quiz", ({ quizId }) => {
+    if (!quizId || !rooms[quizId]) {
+      console.log(`⚠️ Cannot start quiz. Quiz ${quizId} does not exist.`);
+      return;
+    }
+
     console.log(`🚀 Quiz ${quizId} started!`);
-    io.emit("quiz_started", { quizId });
+    io.to(quizId).emit("quiz_started", { quizId });
   });
 
   // Handle disconnects
   socket.on("disconnect", () => {
-    const { quizId, userId } = socket;
-    if (quizId && rooms[quizId]) {
-      rooms[quizId].delete(userId);
+    const { quizId, name } = socket;
+    if (quizId && rooms[quizId] && name) {
+      rooms[quizId].delete(name);
       const count = rooms[quizId].size;
-      io.emit("participant_count_update", { quizId, count });
-      console.log(`🔴 User ${userId} left quiz ${quizId}. Remaining: ${count}`);
+      io.to(quizId).emit("participant_count_update", { quizId, count });
+      console.log(`🔴 User ${name} left quiz ${quizId}. Remaining: ${count}`);
     }
   });
 });
-
 
 // --- EXPRESS MIDDLEWARES ---
 app.use(cors());
@@ -82,7 +93,6 @@ mongoose
   .then(() => console.log("✅ Connected to MongoDB Atlas"))
   .catch((err) => console.error("❌ MongoDB connection error:", err));
 
-
 // --- SCHEMAS AND MODELS ---
 const resultSchema = new mongoose.Schema({
   name: String,
@@ -97,13 +107,11 @@ const quizControlSchema = new mongoose.Schema({
 const Result = mongoose.model("Result", resultSchema);
 const QuizControl = mongoose.model("QuizControl", quizControlSchema);
 
-
 // --- ROUTES ---
 app.get("/", (req, res) => {
   res.send("✅ Backend with Socket.IO is running fine!");
 });
 
-// Save participant result
 app.post("/api/results", async (req, res) => {
   try {
     const { name, score, date } = req.body;
@@ -120,7 +128,6 @@ app.post("/api/results", async (req, res) => {
   }
 });
 
-// Get results
 app.get("/api/results", async (req, res) => {
   try {
     const results = await Result.find().sort({ score: -1, date: 1 });
@@ -130,7 +137,6 @@ app.get("/api/results", async (req, res) => {
   }
 });
 
-// Clear results (Admin only)
 app.delete("/api/results", async (req, res) => {
   try {
     await Result.deleteMany({});
@@ -140,7 +146,6 @@ app.delete("/api/results", async (req, res) => {
   }
 });
 
-// Get quiz status
 app.get("/api/quiz-status", async (req, res) => {
   try {
     let quizControl = await QuizControl.findOne();
@@ -154,7 +159,6 @@ app.get("/api/quiz-status", async (req, res) => {
   }
 });
 
-// Update quiz status
 app.post("/api/quiz-status", async (req, res) => {
   try {
     const { active } = req.body;
