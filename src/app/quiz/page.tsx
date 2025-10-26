@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { questions, Question } from "@/data/questions";
 
+
 export default function QuizPage() {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);

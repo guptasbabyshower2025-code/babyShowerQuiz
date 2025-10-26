@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import io from "socket.io-client";
+
 
 interface Result {
   id: number;
@@ -15,12 +17,28 @@ export default function AdminPage() {
   const [quizActive, setQuizActive] = useState(false);
   const [quizLoading, setQuizLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [participantCount, setParticipantCount] = useState(0);
+
+  useEffect(() => {
+    const socket = io("https://babyshowerquiz.onrender.com");
+
+    // Listen for participant count updates
+    socket.on("participantCount", (count: number) => {
+      setParticipantCount(count);
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, []);
 
   // ✅ Fetch quiz status
   useEffect(() => {
     const fetchQuizStatus = async () => {
       try {
-        const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status");
+        const res = await fetch(
+          "https://babyshowerquiz.onrender.com/api/quiz-status"
+        );
         const data = await res.json();
         setQuizActive(data.active); // backend should return { active: true/false }
       } catch (err) {
@@ -61,13 +79,21 @@ export default function AdminPage() {
   const handleToggle = async () => {
     setUpdating(true);
     try {
-      const res = await fetch("https://babyshowerquiz.onrender.com/api/quiz-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ active: !quizActive }),
-      });
+      const res = await fetch(
+        "https://babyshowerquiz.onrender.com/api/quiz-status",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ active: !quizActive }),
+        }
+      );
       const data = await res.json();
       setQuizActive(data.active);
+
+      if (!quizActive) {
+        const socket = io("https://babyshowerquiz.onrender.com");
+        socket.emit("startQuiz");
+      }
     } catch (err) {
       console.error("Error updating quiz status:", err);
     } finally {
@@ -93,6 +119,10 @@ export default function AdminPage() {
         <h2 className="text-lg font-semibold text-gray-700 mb-3">
           Quiz Control
         </h2>
+        <p className="text-lg mb-2">
+          👥 Participants joined:{" "}
+          <span className="font-bold">{participantCount}</span>
+        </p>
 
         {quizLoading ? (
           <p className="text-gray-500">Loading quiz status...</p>

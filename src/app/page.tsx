@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import io from "socket.io-client";
+const socket = io("https://babyshowerquiz.onrender.com");
 
 export default function HomePage() {
   const router = useRouter();
@@ -13,25 +15,26 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-
   const handleStart = async () => {
     if (!name.trim()) {
       alert("Please enter your name!");
-      nameInputRef.current?.focus(); 
+      nameInputRef.current?.focus();
       return;
     }
+
     setLoading(true);
-
     const isActive = await fetchQuizStatus();
-
     setLoading(false);
 
-    if (!isActive) {
-      alert("Quiz is not active!");
-      return;
-    }
     localStorage.setItem("playerName", name);
-    router.push("/quiz");
+
+    if (!isActive) {
+      // Quiz not started yet → join waiting room
+      socket.emit("joinWaitingRoom", name);
+      router.push("/waiting-room");
+    } else {
+      router.push("/quiz");
+    }
   };
   // const goToAdmin = () => {
   //   const password = prompt("Enter admin password:");
