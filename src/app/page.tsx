@@ -6,6 +6,8 @@ import { motion } from "framer-motion";
 import io from "socket.io-client";
 const socket = io("https://babyshowerquiz.onrender.com");
 
+import { DotLottieReact } from "@lottiefiles/dotlottie-react";
+
 export default function HomePage() {
   const router = useRouter();
   const [name, setName] = useState("");
@@ -28,6 +30,8 @@ export default function HomePage() {
     // Quiz not started yet → join waiting room
     setLoading(true);
     const isActive = await fetchQuizStatus(); // fetch the quiz status
+    console.log("Logggggg", isActive);
+
     if (!isActive) {
       socket.emit(
         "join_room",
@@ -45,7 +49,9 @@ export default function HomePage() {
   };
   const fetchQuizStatus = async () => {
     try {
-      const res = await fetch("http://localhost:3001/api/quiz-status");
+      const res = await fetch(
+        "https://babyshowerquiz.onrender.com/api/quiz-status"
+      );
       const data = await res.json();
       setQuizActive(data.active); // backend should return { active: true/false }
       return data.active; // return the active status
@@ -74,7 +80,6 @@ export default function HomePage() {
     setAdminPassword("");
     setShowAdminInput(false);
   };
-  
 
   return (
     <main
@@ -112,12 +117,19 @@ export default function HomePage() {
           </button>
         )}
       </div>
+      <div className="absolute top-[7rem] mix-blend-multiply z-[9999]">
+        <DotLottieReact
+          src="https://lottie.host/235bfd1c-a531-4bdf-ba82-abd065921d06/1Er2ogAqi8.lottie"
+          loop
+          autoplay
+        />
+      </div>
       {/* Floating balloons effect */}
       <motion.div
         className="absolute w-20 h-20 bg-pink-300 rounded-full opacity-40"
         animate={{ y: [0, -30, 0] }}
         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-        style={{ top: "10%", left: "20%" }}
+        style={{ top: "90%", left: "20%" }}
       />
       <motion.div
         className="absolute w-16 h-16 bg-pink-400 rounded-full opacity-40"

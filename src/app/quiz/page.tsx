@@ -4,7 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { questions, Question } from "@/data/questions";
-
+import { TiTick } from "react-icons/ti";
+import { GiCrossMark } from "react-icons/gi";
+type Ripple = {
+  x: number;
+  y: number;
+  id: number;
+};
 
 export default function QuizPage() {
   const router = useRouter();
@@ -15,6 +21,8 @@ export default function QuizPage() {
   const [playerName, setPlayerName] = useState("");
   const [quizActive, setQuizActive] = useState(false);
   const [quizLoading, setQuizLoading] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
+  const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
 
   const currentQuestion: Question = questions[currentIndex];
   useEffect(() => {
@@ -35,6 +43,28 @@ export default function QuizPage() {
       console.error("Failed to fetch quiz status:", error);
       return false;
     }
+  };
+  const handleRipple = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    opt: string
+  ) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const id = Date.now();
+
+    setRipples((prev) => ({
+      ...prev,
+      [opt]: [...(prev[opt] || []), { x, y, id }],
+    }));
+
+    // remove ripple after animation
+    setTimeout(() => {
+      setRipples((prev) => ({
+        ...prev,
+        [opt]: (prev[opt] || []).filter((r) => r.id !== id),
+      }));
+    }, 800);
   };
 
   // Timer
@@ -92,6 +122,7 @@ export default function QuizPage() {
 
     setSelectedAnswer("");
     setTimeLeft(20);
+    setShowAnswer(false);
 
     if (currentIndex + 1 < questions.length) {
       setCurrentIndex(currentIndex + 1);
@@ -179,30 +210,137 @@ export default function QuizPage() {
             {/* MCQ */}
             {currentQuestion.type === "mcq" && currentQuestion.options && (
               <div className="flex flex-col gap-3">
-                {currentQuestion.options.map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setSelectedAnswer(opt)}
-                    className={`border text-black rounded-lg p-3 text-left ${
-                      selectedAnswer === opt
-                        ? "bg-[#404040] text-white"
-                        : "bg-gray-100 hover:bg-pink-100"
-                    } transition-all`}
-                  >
-                    {opt}
-                  </button>
-                ))}
+                {currentQuestion.options.map((opt) => {
+                  const isCorrect = opt === currentQuestion.answer;
+                  const isSelected = opt === selectedAnswer;
+
+                  let bgClass = "bg-gray-100";
+                  if (showAnswer) {
+                    if (isSelected && isCorrect) bgClass = "border-green-500";
+                    else if (isSelected && !isCorrect)
+                      bgClass = "border-[#f1553e]";
+                    else if (isCorrect) bgClass = "border-green-500";
+                    else bgClass = "border-[#404040]";
+                  } else if (isSelected) bgClass = "border-[#404040]";
+
+                  return (
+                    <motion.button
+                      key={opt}
+                      onClick={(e) => {
+                        if (!showAnswer) {
+                          handleRipple(e, opt);
+                          setSelectedAnswer(opt);
+                          setShowAnswer(true);
+                        }
+                      }}
+                      disabled={showAnswer}
+                      className={`relative overflow-hidden border-[2px] border-[#404040] text-black bg-gray-100 rounded-lg p-3 flex justify-between items-center transition-all ${bgClass}`}
+                    >
+                      {/* ✅ Ripple only for clicked option */}
+                      <AnimatePresence>
+                        {(ripples[opt] || []).map((r) => (
+                          <motion.span
+                            key={r.id}
+                            initial={{ scale: 0, opacity: 0.4 }}
+                            animate={{ scale: 15, opacity: 0 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.8, ease: "easeOut" }}
+                            style={{
+                              position: "absolute",
+                              top: r.y,
+                              left: r.x,
+                              width: 40,
+                              height: 40,
+                              backgroundColor:
+                                isSelected && isCorrect
+                                  ? "rgba(34,197,94,0.3)" // green ripple
+                                  : "rgba(241,85,62,0.3)", // red ripple
+                              borderRadius: "50%",
+                              pointerEvents: "none",
+                              transform: "translate(-50%, -50%)",
+                            }}
+                          />
+                        ))}
+                      </AnimatePresence>
+
+                      {/* Option text */}
+                      <span>{opt}</span>
+
+                      {/* ✅ Tick / Cross icon */}
+                      {showAnswer &&
+                        isSelected &&
+                        (isCorrect ? (
+                          <TiTick className="text-green-600 h-6 w-6" />
+                        ) : (
+                          <GiCrossMark className="text-[#f1553e] h-5 w-5" />
+                        ))}
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
 
             {currentQuestion.type === "short" && (
-              <input
-                type="text"
-                value={selectedAnswer}
-                onChange={(e) => setSelectedAnswer(e.target.value)}
-                placeholder="Type your answer here"
-                className="w-full text-black border border-[#404040] rounded-lg p-3 focus:outline-none focus:ring-2 focus:border-[#404040]"
-              />
+              <div className="flex flex-col gap-3">
+                <input
+                  type="text"
+                  value={selectedAnswer}
+                  onChange={(e) => setSelectedAnswer(e.target.value)}
+                  placeholder="Type your answer here"
+                  disabled={showAnswer} // disable once checked
+                  onKeyDown={(e) => {
+                    if (
+                      e.key === "Enter" &&
+                      !showAnswer &&
+                      selectedAnswer.trim()
+                    ) {
+                      setShowAnswer(true);
+                    }
+                  }}
+                  className={`w-full text-black border rounded-lg p-3 focus:outline-none focus:ring-2 focus:border-[#404040]
+        ${showAnswer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                />
+
+                <AnimatePresence>
+                  {!showAnswer && (
+                    <motion.button
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.3 }}
+                      onClick={() =>
+                        selectedAnswer.trim() && setShowAnswer(true)
+                      }
+                      className={`self-start mt-1 px-4 py-1.5 bg-[#404040] text-white text-sm font-medium rounded-md shadow-sm transition-all`}
+                    >
+                      Check
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                {showAnswer && (
+                  <div className="text-left">
+                    {selectedAnswer.trim().toLowerCase() ===
+                    currentQuestion.answer.toLowerCase() ? (
+                      <span className="text-green-600 font-semibold">
+                        Correct
+                      </span>
+                    ) : (
+                      <div className="flex flex-col items-start">
+                        <span className="text-red-600 font-semibold">
+                          Incorrect
+                        </span>
+                        <span className="text-gray-700 text-sm mt-1">
+                          Correct Answer:{" "}
+                          <span className="font-semibold text-green-700">
+                            {currentQuestion.answer}
+                          </span>
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
 
             {/* Image Options */}
@@ -219,23 +357,51 @@ export default function QuizPage() {
                   </div>
                 )}
 
-                {/* Options */}
-                <div className="grid grid-cols-2 gap-3">
-                  {currentQuestion.images.map((img) => (
-                    <motion.img
-                      key={img}
-                      src={img}
-                      alt="option"
-                      onClick={() => setSelectedAnswer(img)}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className={`border h-40 w-40 aspect-auto rounded-lg cursor-pointer transition-all ${
-                        selectedAnswer === img
-                          ? "border-[#404040] border-4"
-                          : "border-gray-200"
-                      }`}
-                    />
-                  ))}
+                <div className="grid grid-cols-2 gap-3 place-items-center">
+                  {currentQuestion.images.map((img) => {
+                    const isCorrect = img === currentQuestion.answer;
+                    const isSelected = img === selectedAnswer;
+
+                    let borderClass = "border-gray-200";
+                    let label = "";
+                    let labelColor = "";
+
+                    if (showAnswer) {
+                      if (isSelected && isCorrect) {
+                        borderClass = "border-green-500 border-4";
+                        labelColor = "text-green-600";
+                      } else if (isSelected && !isCorrect) {
+                        borderClass = "border-red-500 border-4";
+                        labelColor = "text-red-600";
+                      } else if (isCorrect) {
+                        borderClass = "border-green-400 border-4";
+                        labelColor = "text-green-600";
+                      }
+                    } else if (isSelected) {
+                      borderClass = "border-[#404040] border-4";
+                    }
+
+                    return (
+                      <motion.div
+                        key={img}
+                        className="relative"
+                        whileHover={{ scale: showAnswer ? 1 : 1.05 }}
+                        whileTap={{ scale: showAnswer ? 1 : 0.95 }}
+                      >
+                        <img
+                          src={img}
+                          alt="option"
+                          onClick={() => {
+                            if (!showAnswer) {
+                              setSelectedAnswer(img);
+                              setShowAnswer(true);
+                            }
+                          }}
+                          className={`h-40 w-40 object-cover rounded-lg cursor-pointer transition-all ${borderClass}`}
+                        />
+                      </motion.div>
+                    );
+                  })}
                 </div>
               </div>
             )}
