@@ -14,7 +14,6 @@ export default function ResultPage() {
   const totalQuestions = 12;
 
   useEffect(() => {
-    // Get window size for confetti
     const handleResize = () => {
       setWindowSize({ width: window.innerWidth, height: window.innerHeight });
     };
@@ -22,7 +21,6 @@ export default function ResultPage() {
     handleResize();
     window.addEventListener("resize", handleResize);
 
-    // Get saved data
     const storedName = localStorage.getItem("playerName") || "Player";
     const storedScore = parseInt(localStorage.getItem("score") || "0", 10);
 
@@ -31,14 +29,6 @@ export default function ResultPage() {
 
     return () => window.removeEventListener("resize", handleResize);
   }, []);
-
-  const getMessage = () => {
-    const percent = (score / totalQuestions) * 100;
-    if (percent === 100) return "Perfect! 🎉 You know your baby stuff!";
-    if (percent >= 75) return "Great job! 👏 Almost perfect!";
-    if (percent >= 50) return "Nice try! 😊 Keep learning!";
-    return "Good effort! 😄 Better luck next time!";
-  };
 
   return (
     <main
@@ -49,13 +39,12 @@ export default function ResultPage() {
         backgroundPosition: "center",
       }}
     >
-      {/* Full-page confetti raining from the top */}
       <Confetti
         width={windowSize.width}
         height={windowSize.height}
         numberOfPieces={300}
         recycle={false}
-        gravity={0.3} // slower fall
+        gravity={0.3}
         tweenDuration={5000}
         colors={["#ffb6c1", "#ff69b4", "#ffffff", "#ffe4e1"]}
       />
@@ -66,17 +55,15 @@ export default function ResultPage() {
         transition={{ duration: 0.8 }}
         className="bg-white rounded-2xl shadow-xl p-8 w-full max-w-md text-center"
       >
-        <h1 className="text-3xl font-bold text-[#404040] mb-4">Thank You!</h1>
-        <p className="text-2xl font-bold text-[#404040] mb-4">
-          {score} / {totalQuestions}
+        <h1 className="text-3xl font-bold text-[#404040] mb-2">Thank You!</h1>
+        <p className="text-xl font-bold text-gray-500 mb-2 ">
+          Score: {score} / {totalQuestions}
         </p>
         <p className="text-xl text-black mb-2">
           <span className="text-black font-semibold">
             We will announce the results soon.
           </span>
         </p>
-
-        {/* <p className="text-gray-700 mb-6">{getMessage()}</p> */}
       </motion.div>
     </main>
   );

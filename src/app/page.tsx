@@ -6,7 +6,6 @@ import { motion } from "framer-motion";
 import io from "socket.io-client";
 const socket = io("https://babyshowerquiz.onrender.com");
 
-import { DotLottieReact } from "@lottiefiles/dotlottie-react";
 
 export default function HomePage() {
   const router = useRouter();
@@ -116,13 +115,6 @@ export default function HomePage() {
             Admin Login
           </button>
         )}
-      </div>
-      <div className="absolute top-[7rem] mix-blend-multiply z-[9999]">
-        <DotLottieReact
-          src="https://lottie.host/235bfd1c-a531-4bdf-ba82-abd065921d06/1Er2ogAqi8.lottie"
-          loop
-          autoplay
-        />
       </div>
       {/* Floating balloons effect */}
       <motion.div

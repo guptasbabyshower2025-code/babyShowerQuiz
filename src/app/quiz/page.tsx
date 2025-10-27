@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { questions, Question } from "@/data/questions";
 import { TiTick } from "react-icons/ti";
 import { GiCrossMark } from "react-icons/gi";
+
 type Ripple = {
   x: number;
   y: number;
@@ -16,38 +17,40 @@ export default function QuizPage() {
   const router = useRouter();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState("");
-  const [score, setScore] = useState(1);
-  const [timeLeft, setTimeLeft] = useState(20); // 20s per question
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(20);
   const [playerName, setPlayerName] = useState("");
   const [quizActive, setQuizActive] = useState(false);
   const [quizLoading, setQuizLoading] = useState(false);
   const [showAnswer, setShowAnswer] = useState(false);
   const [ripples, setRipples] = useState<Record<string, Ripple[]>>({});
+  const [feedbackTimeout, setFeedbackTimeout] = useState<NodeJS.Timeout | null>(
+    null
+  );
 
   const currentQuestion: Question = questions[currentIndex];
+
   useEffect(() => {
     const storedName = localStorage.getItem("playerName");
     if (storedName) setPlayerName(storedName);
   }, []);
+
   const fetchQuizStatus = async (): Promise<boolean> => {
     try {
       const res = await fetch(
         "https://babyshowerquiz.onrender.com/api/quiz-status"
       );
       const data = await res.json();
-
       setQuizActive(data.active);
-
       return data.active;
     } catch (error) {
       console.error("Failed to fetch quiz status:", error);
       return false;
     }
   };
-  const handleRipple = (
-    e: React.MouseEvent<HTMLButtonElement>,
-    opt: string
-  ) => {
+
+  // Ripple handler
+  const handleRipple = (e: React.MouseEvent<HTMLButtonElement>, opt: string) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -58,7 +61,6 @@ export default function QuizPage() {
       [opt]: [...(prev[opt] || []), { x, y, id }],
     }));
 
-    // remove ripple after animation
     setTimeout(() => {
       setRipples((prev) => ({
         ...prev,
@@ -69,80 +71,74 @@ export default function QuizPage() {
 
   // Timer
   useEffect(() => {
+    if (showAnswer) return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => prev - 1);
     }, 1000);
-
     if (timeLeft <= 0) handleNext();
-
     return () => clearInterval(timer);
-  }, [timeLeft]);
+  }, [timeLeft, showAnswer]);
+
   const submitResult = async (playerName: string, score: number) => {
     try {
-      const res = await fetch(
-        "https://babyshowerquiz.onrender.com/api/results",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: playerName,
-            score,
-            date: new Date().toISOString(),
-          }),
-        }
-      );
-
-      const data = await res.json();
-      if (data.success) {
-        console.log("Result saved:", data);
-      } else {
-        console.error("Error saving result:", data.error);
-      }
+      await fetch("https://babyshowerquiz.onrender.com/api/results", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: playerName,
+          score,
+          date: new Date().toISOString(),
+        }),
+      });
     } catch (err) {
       console.error("Network error:", err);
     }
   };
 
   const handleNext = async () => {
-    if (selectedAnswer) {
-      if (
-        (currentQuestion.type === "short" &&
-          selectedAnswer.trim().toLowerCase() ===
-            currentQuestion.answer.toLowerCase()) ||
-        (currentQuestion.type === "mcq" &&
-          selectedAnswer === currentQuestion.answer) ||
-        (currentQuestion.type === "image" &&
-          selectedAnswer === currentQuestion.answer)
-      ) {
-        setScore(score + 1);
-      }
-    }
+    setShowAnswer(true);
 
-    setSelectedAnswer("");
-    setTimeLeft(20);
-    setShowAnswer(false);
+    const isCorrect =
+      (currentQuestion.type === "short" &&
+        selectedAnswer.trim().toLowerCase() ===
+          currentQuestion.answer.toLowerCase()) ||
+      (currentQuestion.type === "mcq" &&
+        selectedAnswer === currentQuestion.answer) ||
+      (currentQuestion.type === "image" &&
+        selectedAnswer === currentQuestion.answer);
 
-    if (currentIndex + 1 < questions.length) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      // ⏳ Start loader for final submission
-      setQuizLoading(true);
+    if (isCorrect) setScore((prev) => prev + 1);
 
-      const isActive = await fetchQuizStatus();
+    const timeout = setTimeout(async () => {
+      setShowAnswer(false);
+      setSelectedAnswer("");
+      setTimeLeft(20);
 
-      if (isActive) {
-        await submitResult(playerName, score);
-        setQuizLoading(false);
-        router.push("/result");
+      if (currentIndex + 1 < questions.length) {
+        setCurrentIndex((prev) => prev + 1);
       } else {
+        setQuizLoading(true);
+        const isActive = await fetchQuizStatus();
+        if (isActive) {
+          localStorage.setItem("score", score.toString());
+          await submitResult(playerName, score);
+          router.push("/result");
+        } else {
+          alert("Quiz is no longer active!");
+          router.push("/");
+        }
         setQuizLoading(false);
-        alert("Quiz is no longer active!");
-        router.push("/");
       }
-    }
+    }, 1500);
+
+    setFeedbackTimeout(timeout);
   };
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimeout) clearTimeout(feedbackTimeout);
+    };
+  }, [feedbackTimeout]);
 
   return (
     <main
@@ -154,6 +150,7 @@ export default function QuizPage() {
       }}
     >
       <div className="w-full max-w-lg">
+        {/* Timer */}
         <div className="flex flex-col items-center justify-center mb-6">
           <div className="relative w-26 h-26">
             <svg className="w-26 h-26 transform -rotate-90">
@@ -174,15 +171,12 @@ export default function QuizPage() {
                 fill="transparent"
                 strokeDasharray={2 * Math.PI * 45}
                 strokeDashoffset={2 * Math.PI * 45 * (1 - timeLeft / 20)}
-                initial={{ strokeDashoffset: 2 * Math.PI * 45 }}
                 animate={{
                   strokeDashoffset: 2 * Math.PI * 45 * (1 - timeLeft / 20),
                 }}
                 transition={{ duration: 1, ease: "linear" }}
               />
             </svg>
-
-            {/* Timer Text */}
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-md font-semibold text-gray-700">
                 {currentIndex + 1}/{questions.length}
@@ -194,6 +188,7 @@ export default function QuizPage() {
           </div>
         </div>
 
+        {/* Question */}
         <AnimatePresence mode="wait">
           <motion.div
             key={currentIndex}
@@ -214,14 +209,12 @@ export default function QuizPage() {
                   const isCorrect = opt === currentQuestion.answer;
                   const isSelected = opt === selectedAnswer;
 
-                  let bgClass = "bg-gray-100";
+                  let borderClass = "border-[#404040]";
                   if (showAnswer) {
-                    if (isSelected && isCorrect) bgClass = "border-green-500";
+                    if (isCorrect) borderClass = "border-green-500 border-2";
                     else if (isSelected && !isCorrect)
-                      bgClass = "border-[#f1553e]";
-                    else if (isCorrect) bgClass = "border-green-500";
-                    else bgClass = "border-[#404040]";
-                  } else if (isSelected) bgClass = "border-[#404040]";
+                      borderClass = "border-red-500 border-2";
+                  } else if (isSelected) borderClass = "border-[#404040] border-2";
 
                   return (
                     <motion.button
@@ -230,13 +223,11 @@ export default function QuizPage() {
                         if (!showAnswer) {
                           handleRipple(e, opt);
                           setSelectedAnswer(opt);
-                          setShowAnswer(true);
                         }
                       }}
-                      disabled={showAnswer}
-                      className={`relative overflow-hidden border-[2px] border-[#404040] text-black bg-gray-100 rounded-lg p-3 flex justify-between items-center transition-all ${bgClass}`}
+                      className={`relative overflow-hidden text-black bg-gray-100 rounded-lg p-3 flex justify-between items-center border transition-all ${borderClass}`}
                     >
-                      {/* ✅ Ripple only for clicked option */}
+                      {/* Ripple */}
                       <AnimatePresence>
                         {(ripples[opt] || []).map((r) => (
                           <motion.span
@@ -251,10 +242,7 @@ export default function QuizPage() {
                               left: r.x,
                               width: 40,
                               height: 40,
-                              backgroundColor:
-                                isSelected && isCorrect
-                                  ? "rgba(34,197,94,0.3)" // green ripple
-                                  : "rgba(241,85,62,0.3)", // red ripple
+                              backgroundColor: "rgba(64,64,64,0.2)",
                               borderRadius: "50%",
                               pointerEvents: "none",
                               transform: "translate(-50%, -50%)",
@@ -263,60 +251,32 @@ export default function QuizPage() {
                         ))}
                       </AnimatePresence>
 
-                      {/* Option text */}
                       <span>{opt}</span>
-
-                      {/* ✅ Tick / Cross icon */}
-                      {showAnswer &&
-                        isSelected &&
-                        (isCorrect ? (
+                      {showAnswer && isSelected && (
+                        isCorrect ? (
                           <TiTick className="text-green-600 h-6 w-6" />
                         ) : (
                           <GiCrossMark className="text-[#f1553e] h-5 w-5" />
-                        ))}
+                        )
+                      )}
                     </motion.button>
                   );
                 })}
               </div>
             )}
 
+            {/* Short Answer */}
             {currentQuestion.type === "short" && (
               <div className="flex flex-col gap-3">
                 <input
                   type="text"
                   value={selectedAnswer}
-                  onChange={(e) => setSelectedAnswer(e.target.value)}
+                  onChange={(e) => !showAnswer && setSelectedAnswer(e.target.value)}
                   placeholder="Type your answer here"
-                  disabled={showAnswer} // disable once checked
-                  onKeyDown={(e) => {
-                    if (
-                      e.key === "Enter" &&
-                      !showAnswer &&
-                      selectedAnswer.trim()
-                    ) {
-                      setShowAnswer(true);
-                    }
-                  }}
-                  className={`w-full text-black border rounded-lg p-3 focus:outline-none focus:ring-2 focus:border-[#404040]
-        ${showAnswer ? "bg-gray-100 cursor-not-allowed" : ""}`}
+                  className={`w-full text-black border rounded-lg p-3 ${
+                    showAnswer ? "bg-gray-100 cursor-not-allowed" : ""
+                  }`}
                 />
-
-                <AnimatePresence>
-                  {!showAnswer && (
-                    <motion.button
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      transition={{ duration: 0.3 }}
-                      onClick={() =>
-                        selectedAnswer.trim() && setShowAnswer(true)
-                      }
-                      className={`self-start mt-1 px-4 py-1.5 bg-[#404040] text-white text-sm font-medium rounded-md shadow-sm transition-all`}
-                    >
-                      Check
-                    </motion.button>
-                  )}
-                </AnimatePresence>
 
                 {showAnswer && (
                   <div className="text-left">
@@ -343,10 +303,9 @@ export default function QuizPage() {
               </div>
             )}
 
-            {/* Image Options */}
+            {/* Image Question */}
             {currentQuestion.type === "image" && currentQuestion.images && (
               <div className="flex flex-col gap-4">
-                {/* Sample Image */}
                 {currentQuestion.sampleImage && (
                   <div className="text-center mb-2">
                     <img
@@ -363,43 +322,23 @@ export default function QuizPage() {
                     const isSelected = img === selectedAnswer;
 
                     let borderClass = "border-gray-200";
-                    let label = "";
-                    let labelColor = "";
-
                     if (showAnswer) {
-                      if (isSelected && isCorrect) {
-                        borderClass = "border-green-500 border-4";
-                        labelColor = "text-green-600";
-                      } else if (isSelected && !isCorrect) {
+                      if (isCorrect) borderClass = "border-green-500 border-4";
+                      else if (isSelected && !isCorrect)
                         borderClass = "border-red-500 border-4";
-                        labelColor = "text-red-600";
-                      } else if (isCorrect) {
-                        borderClass = "border-green-400 border-4";
-                        labelColor = "text-green-600";
-                      }
-                    } else if (isSelected) {
+                    } else if (isSelected)
                       borderClass = "border-[#404040] border-4";
-                    }
 
                     return (
-                      <motion.div
+                      <motion.img
                         key={img}
-                        className="relative"
+                        src={img}
+                        alt="option"
+                        onClick={() => !showAnswer && setSelectedAnswer(img)}
                         whileHover={{ scale: showAnswer ? 1 : 1.05 }}
                         whileTap={{ scale: showAnswer ? 1 : 0.95 }}
-                      >
-                        <img
-                          src={img}
-                          alt="option"
-                          onClick={() => {
-                            if (!showAnswer) {
-                              setSelectedAnswer(img);
-                              setShowAnswer(true);
-                            }
-                          }}
-                          className={`h-40 w-40 object-cover rounded-lg cursor-pointer transition-all ${borderClass}`}
-                        />
-                      </motion.div>
+                        className={`h-40 w-40 object-cover rounded-lg cursor-pointer transition-all ${borderClass}`}
+                      />
                     );
                   })}
                 </div>
@@ -407,26 +346,20 @@ export default function QuizPage() {
             )}
 
             {/* Next Button */}
-
             <motion.button
               onClick={handleNext}
-              disabled={!selectedAnswer || quizLoading}
+              disabled={!selectedAnswer || quizLoading || showAnswer}
               whileHover={{ scale: quizLoading ? 1 : 1.03 }}
               whileTap={{ scale: quizLoading ? 1 : 0.95 }}
               className={`mt-6 w-full flex justify-center items-center gap-2 
-        ${quizLoading ? "bg-gray-600" : "bg-[#404040]"} 
-        text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50`}
+              ${quizLoading ? "bg-gray-600" : "bg-[#404040]"} 
+              text-white font-semibold py-3 rounded-lg transition-all disabled:opacity-50`}
             >
               {quizLoading ? (
-                // 🌀 Framer Motion Loader
                 <motion.div
                   className="w-6 h-6 border-4 border-white border-t-transparent rounded-full"
                   animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 0.8,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
+                  transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
                 />
               ) : currentIndex + 1 === questions.length ? (
                 "Submit"
